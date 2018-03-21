@@ -37,7 +37,7 @@ void setup() {
 
 void loop(){
 
-  serialEvent(); // FEATHER DOESNT SUPPORT SERIAL EVENTS
+  serialEvent(); // TEMPORARY: FEATHER DOESNT SUPPORT SERIAL EVENTS
 
 }
 
