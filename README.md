@@ -1,13 +1,15 @@
 # people-seven
 
   People Counter - Receiver Node
-  == Program receives a value over i2c and displays in an array of
-  == 6 x seven segment displays
-  == programmed to run on Teensy 3.2
 
-  Carlos Valente 15.03.18
+  Program receives values over i2c and displays in an array of
+  6 x seven segment displays <br />
+  Programmed to run on Teensy 3.2 <br />
 
-  =======| TODO
+
+  ### TODO
+
+  ```
   - Receive value over serial / i2c https://www.pjrc.com/teensy/td_libs_Wire.html
   -- Read values from custom header
   - Implement timers
@@ -18,14 +20,20 @@
   - Add file header
   - Extend Symbol Encoding for alphanumeric
   -- Simplified serial receiver should handle char
+  ```
 
-  =======| Implemented
+  ### Implemented
+
+  ```
   - Serial for debug and comm
   - Create lookup table for numeric characters
   - Write simple values to displays
   -- Use PORT instead of digitalWrite
+  ```
 
-  =======| EXTEND
+  ### EXTEND
+
+  ```
   - Real values
   - Different display modes
   - Write ID to EEPROM? https://www.pjrc.com/teensy/td_libs_EEPROM.html
@@ -41,9 +49,12 @@
   -- Write faster shiftOut
   -- Display is class?
   - Debug Mode
+   ```
 
 
-  =======| COMMS - HEADER DESCRIPTION
+  ### COMMS - HEADER DESCRIPTION
+
+  ```
   - 0x00. Check
   - 1. Datatype description
   -- 0x00. Write new value (bin)
@@ -56,15 +67,20 @@
   -- 0x00 ACK
   - 4. Data byte 1 | Value (Brightness)
   - n. Data byte n
+  ```
 
-    =======| SCREEN MODES
+  ### SCREEN MODES
+
+  ```
   - 0x00. Display array
   - 0x01. Display All
   - 0x02. Display None
   - 0x04. DEBUG
+  ```
 
-    =======| SEGMENTS ARRANGEMENT (MSBFIRST)
+  ### SEGMENTS ARRANGEMENT (MSBFIRST)
 
+ ```
     1111111
   6         2
   6         2
@@ -75,3 +91,8 @@
   5         3
     4444444     88
                 88
+ ```
+
+ ### License
+
+ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
