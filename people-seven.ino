@@ -1,118 +1,128 @@
+/*
+  NOTES:
+  - Had some problems with the wire library in the Master
+  Seem to work fine here
+  Either way https://www.pjrc.com/teensy/td_libs_Wire.html
+
+  - Receive events are not fully implemented, I2C expects a int32 number
+*/
+
 #include "DEFINITIONS.h"
 
 // ================ | COMMS
 //const int ADDRESS = EEPROM.read(ADDRESS); //NIU
 
 // ================ | Display
-byte digits_b[DIGITS_SIZE]    = ""; // Display state
-byte brightness = 255;              // initialize at full brightness
+byte digits_b[DIGITS_SIZE];   // Display state
+byte brightness = 255;        // Initialize at full brightness - NIU
+unsigned long counter = 0;    // Debug
+bool newData = false;         // Data flag
 
 void setup() {
-
   // ================ | INIT I/O for 7 Segment
   pinMode(DATA_PIN,  OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
 
   // ================ | INIT Comms - I2C Inter machine
-  //Wire.setSDA(18);            // Pinout for Teensy 3.2
-  //Wire.setSCL(19);            // Not compatible with arduino library
   Wire.begin(ADDRESS);          // join i2c bus
-  Wire.onReceive(receiveEvent); // register event handlers
-  Wire.onRequest(requestEvent);
+  Wire.onReceive(receiveEvent); // register event handlers -NIU
 
   // ================ | INIT Comms - Serial Debug
-  Serial.begin(38400);
-  while (!Serial){ ; } // Wait for connection
-  Serial.println("STARTED");
+  Serial.begin(9600);
+  delay(1000);                    // Little sleep
+  Serial.println("PEOPLE SEVEN STARTED");
 
   // ================ | INIT Aux Variables
   for (int i = 0; i < DIGITS_SIZE; ++i){
-    /* Show - on everything if not initialized */
-    digits_b[i] =  DASH;
+    /* Show DASH on everything if not initialized */
+    digits_b[i] = DASH;
   }
-  updateDisplay();
 }
 
-
 void loop(){
-
-  serialEvent(); // TEMPORARY: FEATHER DOESNT SUPPORT SERIAL EVENTS
-
+  if (newData) updateDisplay();
 }
 
 void serialEvent() {
   /* Handler for Serial comm in */
-  while (Serial.available()) {
-
-    byte check = Serial.peek();  // check byte for formatted data
-    Serial.println("BYTE RECEIVED: " + check);
-
-    if (check != 0x00){
+  if (Serial.available() > 0) {
+    newData = true;
+    char check = Serial.peek();  // check byte for formatted data
+    if (check != SS_CHECK){
       /* Not formatted data, proceed as int data */
-      int c = Serial.parseInt();  // should be modified to receive char
-      populateDigits(c);
+		  if (check != '\n' && check != '\r') {
+            int c = Serial.parseInt();  // modify to receive char
+            populateDigits(c);
+		  } else {
+        while (Serial.available())
+          Serial.read();              // Discard data ??
+		  }
+     }
 
-    } else {
-      /* Checked true for formatted data */
-      String ss = "";
-      Serial.read();  // discard first byte
-      byte ctrl = Serial.read();   // control byte
-      byte ACK  = Serial.read();   // should this come after all of it?
+    /* Checked true for formatted data */
+    String ss;
+    Serial.read();               // discard first byte
+    byte ctrl = Serial.read();   // control byte
+    byte ACK  = Serial.read();   // should this come after all of it?
 
-      switch (ctrl){
-        case 0x00:  // Write new value from binary
-          int g;
-          byte bf;
-          bf = Serial.peek();
-          g = Serial.parseInt();
-          ss += "Control 1: Write new value \n";
-          ss += "Byte: " + bf;
-          ss += " Int: " + g;
+    bool bDoRestart = false;
+    switch (ctrl){
+          case SS_WRBIN:  // Write new value from binary
+          int intVal;
+          byte byteVal;
+          byteVal = Serial.peek();
+          intVal = Serial.parseInt();
+          ss += "Control 1: Write new value from binary\n";
+          ss += "Byte: " + byteVal;
+          ss += " Int: " + intVal;
           populateDigits(Serial.parseInt());
-        break;
+          break;
 
-        case 0x01:  // Write new value from char
-          int s;
-          byte sa;
-          bf = Serial.peek();
-          g = Serial.parseInt();
-          ss += "Control 2: Write new value \n";
-          ss += "Byte: " + sa;
-          ss += " Int: " + s;
-        break;
+          case SS_WRVAL:  // Write new value from char
+          int intVal;
+          byte byteVal;
+          byteVal = Serial.peek();
+          intVal = Serial.parseInt();
+          ss += "Control 2: Write new value from char\n";
+          ss += "Byte: " + byteVal;
+          ss += " Int: " + intVal;
+          break;
 
-        case 0x02:  // Set Brightness
+          case SS_WBRI:  // Set Brightness
           brightness = Serial.read();
           ss += "Control 3: Set Bright \n";
           ss += " Val: " + brightness;
-        break;
+          break;
 
-        case 0x03:  // Reboot
-          ss += "Control 4: Change Mode \n";
-        break;
+          case SS_RBOT:  // Reboot
+          bDoRestart = true;
+          ss += "Control 4: Reboot \n";
+          break;
 
-        case 0x04:  // Change Mode
+          case SS_MODE:  // Change Mode
           // Nothing yet
           ss += "Control 5: Change Mode \n";
-        break;
+          break;
 
-        default:
+          default:
           /* Trow error */
           ss += "ERROR: control not implemented \n";
-        break;
-        while (Serial.available()) Serial.read(); // Discard data ??
-      }
-      if (ACK == 0x00) Serial.println(ss);  // good enough for now
-    }
+          ss += "Control:" + crtl + "\n";
+          while (Serial.available()) Serial.read(); // Discard data ??
+          break;
+        }
+    if (ACK == SS_ACK) Serial.println(ss);        // good enough for now
+    if (bDoRestart) _softRestart();
   }
 }
+
 
 void populateDigits(int number){
   /* Populate digits from int */
   for (int i = 0; i < DIGITS_SIZE; ++i){
     /* Show 8 on everything if not initialized */
-    digits_b[i] = NUMERIC[8];
+    digits_b[i] = NUMERIC[0];
   }
 
   int count = 1;
@@ -121,6 +131,7 @@ void populateDigits(int number){
     number /= 10;
     count++;
   }
+  newData = true;
 }
 
 void updateDisplay(){
@@ -130,6 +141,8 @@ void updateDisplay(){
     send(digits_b[i]); // send data
   }
   PORTD |= (1<<LATCH_PIN);
+
+  newData = false;    // reset flag
 }
 
 void allHigh(){
@@ -160,18 +173,24 @@ void receiveEvent(int n){
   /* Handler for when a message is received */
   /* THIS IS A PLACE HOLDER, IMPLEMENTATION
    * SHOULD BE THE SAME AS SERIAL EVENT */
-  while (1 < Wire.available()) {  // loop through all but the last
-    char c = Wire.read();         // receive byte as a character
-    Serial.print(c);
-  }
-  int x = Wire.read();           // receive byte as an integer
-  Serial.println(x);
-}
+   long longReceived;
+   byte byteArray[n];
 
-void requestEvent(){
-  /* Handler for request events */
-  Wire.write("nothing yet");
-  Serial.println("requested");
+   Serial.println("Reading I2C...");
+
+   for (int i = 0; i < n; i++){
+    byteArray[i] = Wire.read();
+   }
+
+  longReceived = ( ((unsigned long)byteArray[0] << 24)
+               + (  (unsigned long)byteArray[1] << 16)
+               + (  (unsigned long)byteArray[2] << 8 )
+               + (  (unsigned long)byteArray[3]      ));
+
+  Serial.print("Received: ");
+  Serial.println(longReceived);
+  Serial.print("Updating screen");
+  populateDigits(longReceived);
 }
 
 void updateID(byte val, int address){
@@ -184,18 +203,4 @@ void _softRestart(){
   Serial.end();
   Wire.end();
   SCB_AIRCR = 0x05FA0004;  // restart TEENSY
-}
-
-void printLoop(){
-  /* Send character 0 -9 to all digits */
-  for (int i = 9; i >= 0; --i){
-    PORTD &= ~(1<<LATCH_PIN); // latch low
-
-    for (int i = DIGITS_SIZE; i >= 0; --i){
-      send(NUMERIC[i]);
-    }
-
-    PORTD |= (1<<LATCH_PIN);  // latch high
-    delay(500);               // Bad c
-  }
 }

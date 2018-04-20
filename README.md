@@ -55,7 +55,7 @@
   ### COMMS - HEADER DESCRIPTION
 
   ```
-  - 0x00. Check
+  - 0x3F. Protocol check '?'
   - 1. Datatype description
   -- 0x00. Write new value (bin)
   -- 0x01. Write new value (char)
@@ -67,6 +67,7 @@
   -- 0x00 ACK
   - 4. Data byte 1 | Value (Brightness)
   - n. Data byte n
+  - \r. End with CR
   ```
 
   ### SCREEN MODES
