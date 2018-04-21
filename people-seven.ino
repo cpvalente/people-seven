@@ -14,9 +14,9 @@
 
 // ================ | Display
 byte digits_b[DIGITS_SIZE];   // Display state
-byte brightness = 255;        // Initialize at full brightness - NIU
-unsigned long counter = 0;    // Debug
-bool newData = false;         // Data flag
+byte brightness = 100;        // Initialize at full brightness
+byte cycle;
+bool newData;                 // Data flag
 
 void setup() {
   // ================ | INIT I/O for 7 Segment
@@ -25,8 +25,8 @@ void setup() {
   pinMode(CLOCK_PIN, OUTPUT);
 
   // ================ | INIT Comms - I2C Inter machine
-  Wire.begin(ADDRESS);          // join i2c bus
-  Wire.onReceive(receiveEvent); // register event handlers -NIU
+  Wire.begin(ADDRESS);             // join i2c bus
+  Wire.onReceive(receiveEvent);    // register event handlers -NIU
 
   // ================ | INIT Comms - Serial Debug
   Serial.begin(9600);
@@ -34,14 +34,27 @@ void setup() {
   Serial.println("PEOPLE SEVEN STARTED");
 
   // ================ | INIT Aux Variables
-  for (int i = 0; i < DIGITS_SIZE; ++i){
+  for (int i = DIGITS_SIZE; i >= 0 ; --i){
     /* Show DASH on everything if not initialized */
     digits_b[i] = DASH;
   }
+  newData = true;
+  cycle = 0;
 }
 
 void loop(){
-  if (newData) updateDisplay();
+  refresh();
+}
+
+void refresh(){
+  /* Simple fake duty cycle */
+  if (brightness == 0) {
+    if (newData) updateDisplay();
+  } else {
+    if (cycle <= brightness) updateDisplay();
+    else clear();
+  }
+  cycle++;
 }
 
 void serialEvent() {
@@ -68,9 +81,9 @@ void serialEvent() {
 
     bool bDoRestart = false;
     switch (ctrl){
-          case SS_WRBIN:  // Write new value from binary
           int intVal;
           byte byteVal;
+          case SS_WRBIN:  // Write new value from binary
           byteVal = Serial.peek();
           intVal = Serial.parseInt();
           ss += "Control 1: Write new value from binary\n";
@@ -80,8 +93,6 @@ void serialEvent() {
           break;
 
           case SS_WRVAL:  // Write new value from char
-          int intVal;
-          byte byteVal;
           byteVal = Serial.peek();
           intVal = Serial.parseInt();
           ss += "Control 2: Write new value from char\n";
@@ -108,7 +119,8 @@ void serialEvent() {
           default:
           /* Trow error */
           ss += "ERROR: control not implemented \n";
-          ss += "Control:" + crtl + "\n";
+          ss += "Control: " + ctrl;
+          ss += "\n";
           while (Serial.available()) Serial.read(); // Discard data ??
           break;
         }
@@ -120,7 +132,7 @@ void serialEvent() {
 
 void populateDigits(int number){
   /* Populate digits from int */
-  for (int i = 0; i < DIGITS_SIZE; ++i){
+  for (int i = DIGITS_SIZE; i >= 0 ; --i){
     /* Show 8 on everything if not initialized */
     digits_b[i] = NUMERIC[0];
   }
@@ -148,7 +160,7 @@ void updateDisplay(){
 void allHigh(){
   /* Set all segments to high */
   PORTD &= ~(1<<LATCH_PIN);
-  for (int i = 0; i < DIGITS_SIZE; ++i){
+  for (int i = DIGITS_SIZE; i >= 0 ; --i){
     send(ALL); // send data
   }
   PORTD |= (1<<LATCH_PIN);
@@ -157,7 +169,7 @@ void allHigh(){
 void clear(){
   /* Set all segments to low */
   PORTD &= ~(1<<LATCH_PIN);
-  for (int i = 0; i < DIGITS_SIZE; ++i){
+  for (int i = DIGITS_SIZE; i >= 0 ; --i){
     send(EMPTY); // send data
   }
   PORTD |= (1<<LATCH_PIN);
@@ -189,7 +201,7 @@ void receiveEvent(int n){
 
   Serial.print("Received: ");
   Serial.println(longReceived);
-  Serial.print("Updating screen");
+  Serial.println("Updating screen...");
   populateDigits(longReceived);
 }
 
@@ -201,6 +213,5 @@ void updateID(byte val, int address){
 void _softRestart(){
   /* Soft restart, Teensy 3.x specific */
   Serial.end();
-  Wire.end();
   SCB_AIRCR = 0x05FA0004;  // restart TEENSY
 }
